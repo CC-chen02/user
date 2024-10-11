@@ -1,0 +1,1392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+//项目
+model Project {
+  id                      String            @id @default(cuid())
+  communityId             String?           @unique
+  name                    String
+  areaName                String            @unique
+  description             String?
+  industryFormat          IndustryFormat    @default(Residential)
+  centralControlTelephone String?
+  attachedFileUrl         String?           @db.Text
+  Staffs                  Staff[]
+  provinceCode            String            @db.Char(6)
+  addressDetail           String
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @default(now()) @updatedAt
+  Households              Household[]
+  Perspectives            Perspective[]     @relation("ProjectPerspectives")
+  Activities              Activity[]
+  Buildings               Building[]
+  Announcements           Announcement[]    @relation("ProjectAnnouncements")
+  Associations            Association[]     @relation("Associations")
+  Inspections             Inspection[]
+  Facilities              Facility[]
+  FacilityOrders          FacilityOrder[]
+  WorkOrders              WorkOrder[]
+  Indicators              Indicator[]
+  AreaValueList           AreaValue[]
+  Diversifications        Diversification[]
+  ParkingSpots            ParkingSpot[]
+  ExpenseItems            ExpenseItem[]
+  ApprovalBook            ApprovalBook?
+}
+
+enum IndustryFormat {
+  Residential
+  PublicBuildings
+  Commercial
+  Hospital
+  School
+  UrbanServices
+}
+
+//
+model Indicator {
+  id        String  @id @default(cuid())
+  name      String
+  value     Float
+  projectId String
+  Project   Project @relation(fields: [projectId], references: [id])
+
+  @@unique([name, projectId])
+}
+
+model AreaValue {
+  id        String  @id @default(cuid())
+  name      String
+  value     Float
+  projectId String
+  Project   Project @relation(fields: [projectId], references: [id])
+
+  @@unique([name, projectId])
+}
+
+//用户
+model User {
+  id                           String                         @id @default(cuid())
+  name                         String
+  gender                       Gender                         @default(Other)
+  phone                        String                         @unique
+  Resident                     Resident?                      @relation("ResidentUser")
+  Staff                        Staff?                         @relation("StaffUser")
+  WorkOrderStatusChangeHistory WorkOrderStatusChangeHistory[] @relation("CreatedByUser")
+  createdAt                    DateTime                       @default(now())
+}
+
+//住户
+model Resident {
+  id                        String                @id @default(cuid())
+  name                      String
+  phone                     String                @unique
+  secondaryPhone            String?
+  avatar                    String?
+  politicsStatus            PoliticsStatus        @default(Mass)
+  openid                    String?
+  primaryHouseholdId        String?
+  birth                     String?               @db.Char(8)
+  createdAt                 DateTime              @default(now())
+  healthState               HealthState           @default(Healthy)
+  identity                  Identity?
+  personId                  String?               @unique
+  visitAcceptable           Boolean?
+  isVip                     Boolean               @default(false)
+  remark                    String?               @db.Text
+  User                      User                  @relation("ResidentUser", fields: [phone], references: [phone])
+  FeeOrders                 FeeOrder[]            @relation("FeeOrders")
+  Perspectives              Perspective[]         @relation("Perspectives")
+  CreatedWorkOrders         WorkOrder[]           @relation("Applicant")
+  GuardsAccessHistory       GuardsAccessRecord[]  @relation("GuardsAccessHistory")
+  ActivityRecords           ActivityRecord[]      @relation("AppliedActivities")
+  JoinedAssociations        Association[]         @relation("JoinedAssociations")
+  AppliedAssociationRecords AssociationRecord[]   @relation("AppliedAssociationRecords")
+  Associations              Association[]
+  IDInfo                    IDInfo?
+  Corporation               Corporation?
+  ResidentHouseholds        ResidentHousehold[]
+  ResidentParkingSpots      ResidentParkingSpot[]
+  BillingRequests           BillingRequest[]
+}
+
+//住户-车位
+model ResidentParkingSpot {
+  id            String       @id @default(cuid())
+  residentPhone String
+  Resident      Resident     @relation(fields: [residentPhone], references: [phone])
+  parkingSpotId String
+  ParkingSpot   ParkingSpot  @relation(fields: [parkingSpotId], references: [id])
+  role          ResidentRole
+  isFeePayer    Boolean
+
+  @@unique([residentPhone, parkingSpotId])
+}
+
+//住户-房屋
+model ResidentHousehold {
+  id            String       @id @default(cuid())
+  residentPhone String
+  Resident      Resident     @relation(fields: [residentPhone], references: [phone])
+  householdId   String
+  Household     Household    @relation(fields: [householdId], references: [id])
+  role          ResidentRole
+  isFeePayer    Boolean
+
+  @@unique([residentPhone, householdId])
+}
+
+enum ResidentRole {
+  Owner
+  Tenant
+  Member
+  Staff
+  Other
+}
+
+model Diversification {
+  id           String        @id @default(cuid())
+  name         String
+  phone        String
+  type         ClientType
+  taxPayerId   String
+  enabled      Boolean       @default(true)
+  remark       String?       @db.VarChar(600)
+  Projects     Project[]
+  ProposalInfo ProposalInfo?
+}
+
+model ProposalInfo {
+  id                  String            @id @default(cuid())
+  total               Float
+  attachmentUrl       String?           @db.Text
+  costMethod          CostMethod
+  ProposalExpenseList ProposalExpense[]
+  diversificationId   String            @unique
+  Diversification     Diversification   @relation(fields: [diversificationId], references: [id])
+}
+
+model ProposalExpense {
+  id             String       @id @default(cuid())
+  name           String
+  value          Float
+  validityStart  DateTime
+  validityEnd    DateTime
+  paymentStart   DateTime
+  paymentEnd     DateTime
+  proposalInfoId String
+  ProposalInfo   ProposalInfo @relation(fields: [proposalInfoId], references: [id])
+}
+
+enum CostMethod {
+  FixedAmount
+  Percentage
+}
+
+enum ClientType {
+  Personal
+  Corporation
+}
+
+model Corporation {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  legalPerson String
+  name        String
+  contactInfo String
+  residentId  String?   @unique
+  Resident    Resident? @relation(fields: [residentId], references: [id])
+}
+
+enum HealthState {
+  Healthy
+  VisionDisability
+  HearingDisability
+  SpeechDisability
+  LimbDisability
+  IntellectualDisability
+  MentalDisability
+  MultipleDisabilities
+}
+
+enum Identity {
+  AdministrativeInstitution
+  StateEnterprise
+  Retired
+  Veteran
+  IntroducedTalent
+}
+
+enum IDType {
+  IDCard
+  Passport
+  OfficerMilitary
+  Other
+}
+
+model IDInfo {
+  id          String    @id @default(cuid())
+  type        IDType
+  code        String
+  address     String
+  frontPicUrl String?   @db.Text
+  backPicUrl  String?   @db.Text
+  residentId  String?   @unique
+  Resident    Resident? @relation(fields: [residentId], references: [id])
+
+  @@unique([type, code])
+}
+
+enum Gender {
+  Male
+  Female
+  Other
+}
+
+enum PoliticsStatus {
+  PartyMember
+  Mass
+}
+
+//员工
+model Staff {
+  id                     String                   @id @default(cuid())
+  name                   String
+  avatar                 String?
+  openid                 String?
+  phone                  String                   @unique
+  title                  String
+  wwUserId               String?                  @unique
+  department             Department
+  positionId             String
+  enabled                Boolean                  @default(false)
+  User                   User                     @relation("StaffUser", fields: [phone], references: [phone])
+  OperatedWorkOrders     WorkOrder[]              @relation("Operator")
+  AgencyWorkOrders       WorkOrder[]              @relation("Agent")
+  Projects               Project[]
+  Coords                 Coord[]                  @relation("Coords")
+  RenovationViolations   RenovationViolation[]    @relation("RenovationViolations")
+  Position               Position                 @relation(fields: [positionId], references: [id])
+  AddedActivities        Activity[]
+  Announcements          Announcement[]           @relation("Announcements")
+  InspectionsInCharge    Inspection[]             @relation("Director")
+  CreatedInspections     Inspection[]             @relation("CreatedInspections")
+  OperatedFacilityOrders FacilityOrder[]          @relation("FacilityOrderOperator")
+  AssignedFacilityOrders FacilityOrder[]          @relation("FacilityOrderAssigner")
+  HouseholdStatusHistory HouseholdStatusHistory[] @relation("HouseholdStatusHistory")
+  ParkingStatusHistory   ParkingStatusHistory[]   @relation("ParkingStatusHistory")
+  CreatedRoles           Role[]
+  Roles                  Role[]                   @relation("StaffRoles")
+  AppliedDiscounts       Discount[]               @relation("DiscountApplicant")
+  ApprovedDiscounts      Discount[]               @relation("DiscountApprover")
+  Offsets                Offset[]                 @relation("OffsetOperator")
+  AppliedVoidings        Voiding[]                @relation("VodingApplicant")
+  ApprovedVoidings       Voiding[]                @relation("VoidingApprover")
+  CreatedBillingRequests BillingRequest[]         @relation("BillingRequestCreator")
+  ApprovedBillingRequest BillingRequest[]         @relation("BillingRequestApprover")
+  AppliedTransfers       Transfer[]               @relation("TransferApplicant")
+  ApprovedTransfers      Transfer[]               @relation("TransferApprover")
+  AppliedAdjustments     Adjustment[]             @relation("AdjustmentApplicant")
+  ApprovedAdjustments    Adjustment[]             @relation("AdjustmentApprover")
+  BillingRecords         BillingRecord[]          @relation("BillingRecordOperator")
+  PrepaymentDetails      PrepaymentDetail[]       @relation("PrepaymentDetailOperator")
+  PrintRecord            PrintRecord[]
+}
+
+model Coord {
+  id      String   @id @default(cuid())
+  lat     Float
+  lng     Float
+  time    DateTime
+  Staff   Staff    @relation("Coords", fields: [staffId], references: [id])
+  staffId String
+}
+
+model GuardsAccessRecord {
+  id                  String   @id @default(cuid())
+  longitude           Float
+  latitude            Float
+  guardId             String
+  Guard               Device   @relation(fields: [guardId], references: [id])
+  result              Boolean
+  createdAt           DateTime @default(now())
+  CreatedBy           Resident @relation("GuardsAccessHistory", fields: [createdByResidentId], references: [id])
+  createdByResidentId String
+}
+
+//设备
+model Device {
+  id                 String               @id @default(cuid())
+  //   deviceSerial	设备序列号	String	9	是	
+  // validateCode	设备验证码	String	6	是	
+  // deviceName	设备名称	String	50	是	
+  // communityId	社区ID	String	32	是	
+  // buildingId	楼栋ID	String	32	否	
+  // unitId	单元ID	String	32	否
+  scope              EntranceGuardScope
+  GuardsAccessRecord GuardsAccessRecord[]
+}
+
+//岗位
+model Position {
+  id         String     @id @default(cuid())
+  department Department
+  position   String
+  Staff      Staff[]
+}
+
+//设备巡检工单
+model FacilityOrder {
+  id               String              @id @default(cuid())
+  status           FacilityOrderStatus @default(Pending)
+  createdAt        DateTime            @default(now())
+  name             String
+  projectId        String
+  Project          Project             @relation(fields: [projectId], references: [id])
+  type             InspectionType
+  tookAt           DateTime?
+  assignerId       String?
+  Assigner         Staff?              @relation("FacilityOrderAssigner", fields: [assignerId], references: [id])
+  operatorId       String?
+  Operator         Staff?              @relation("FacilityOrderOperator", fields: [operatorId], references: [id])
+  startAt          DateTime?
+  endAt            DateTime?
+  scheduledStartAt DateTime
+  scheduledEndAt   DateTime
+  updatedAt        DateTime            @updatedAt
+  Facilities       Facility[]
+  AnswerSheets     AnswerSheet[]
+}
+
+enum FacilityOrderStatus {
+  Pending
+  InProgress
+  Completed
+  Overtime
+  Unfinished
+}
+
+//保修工单
+model Facility {
+  id              String          @id @default(cuid())
+  name            String
+  place           String
+  projectId       String
+  Project         Project         @relation(fields: [projectId], references: [id])
+  description     String?
+  inspectionTypes String
+  Questionnaire   Questionnaire?
+  Inspections     Inspection[]
+  FacilityOrders  FacilityOrder[]
+  AnswerSheet     AnswerSheet[]
+}
+
+//问卷
+model Questionnaire {
+  id         String     @id @default(cuid())
+  facilityId String     @unique
+  Facility   Facility   @relation(fields: [facilityId], references: [id])
+  Questions  Question[]
+}
+
+//问题
+model Question {
+  id              String           @id @default(cuid())
+  code            Int
+  questionnaireId String
+  Questionnaire   Questionnaire    @relation(fields: [questionnaireId], references: [id])
+  text            String
+  type            QuestionType
+  Options         QuestionOption[]
+
+  @@unique([code, questionnaireId])
+}
+
+//选项
+model QuestionOption {
+  id         String   @id @default(cuid())
+  questionId String
+  Question   Question @relation(fields: [questionId], references: [id])
+  code       String
+  text       String   @db.Text
+
+  @@unique([questionId, code])
+}
+
+//答卷
+model AnswerSheet {
+  id              String        @id @default(cuid())
+  signInUrl       String?       @db.Text
+  signInTime      DateTime
+  signInLongitude Float
+  signInLatitude  Float
+  Answers         Answer[]
+  createdAt       DateTime      @default(now())
+  facilityId      String
+  Facility        Facility      @relation(fields: [facilityId], references: [id])
+  facilityOrderId String
+  facilityOrder   FacilityOrder @relation(fields: [facilityOrderId], references: [id])
+
+  @@unique([facilityId, facilityOrderId])
+}
+
+model Answer {
+  id            String       @id @default(cuid())
+  code          String?
+  description   String
+  selections    String?      @db.Text
+  text          String       @db.Text
+  AnswerSheet   AnswerSheet? @relation(fields: [answerSheetId], references: [id])
+  answerSheetId String?
+  type          QuestionType
+}
+
+model WorkWxDepartment {
+  id       Int    @id
+  name     String
+  parentid Int
+  order    Int
+}
+
+enum QuestionType {
+  Text
+  SingleChoice
+  MultipleChoice
+  Pictures
+}
+
+model Inspection {
+  id          String           @id @default(cuid())
+  name        String
+  projectId   String
+  Project     Project          @relation(fields: [projectId], references: [id])
+  type        InspectionType
+  directorId  String?
+  Director    Staff?           @relation("Director", fields: [directorId], references: [id])
+  Facilities  Facility[]
+  startAt     DateTime
+  endAt       DateTime
+  repeatType  RepeatType
+  status      InspectionStatus
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  createdById String
+  CreatedBy   Staff            @relation("CreatedInspections", fields: [createdById], references: [id])
+}
+
+enum InspectionStatus {
+  Active
+  Off
+}
+
+enum RepeatType {
+  None
+  EveryDay
+  EveryWeek
+  EveryMonth
+}
+
+enum InspectionType {
+  Engineering
+  Order
+  Management
+}
+
+model WechatVideo {
+  id        String   @id
+  token     String
+  title     String
+  createdAt DateTime @default(now())
+}
+
+enum Department {
+  ProjectCustomer
+  ProjectEngineering
+  ProjectOrder
+  ProjectEnvironment
+  ProjectOffice
+  ProjectAccounting
+  HeadGeneralManagerOffice
+  HeadOperationalQuality
+  HeadHrAndAdmin
+  HeadEngineering
+  HeadAccounting
+  HeadBusinessDevelopment
+  RealEstate
+  RealEstateDreamer
+  Other
+}
+
+model Building {
+  id               String       @id @default(cuid())
+  communityId      String
+  Community        Project      @relation(fields: [communityId], references: [communityId])
+  Units            Unit[]
+  name             String
+  number           String       @db.Char(3)
+  floorUpCount     String       @db.Char(3)
+  floorDownCount   String       @default("0") @db.Char(1)
+  floorFamilyCount String       @db.Char(2)
+  unitSize         String       @db.Char(2)
+  remark           String?
+  type             BuildingType @default(Residential)
+  Household        Household[]
+}
+
+enum ParkingClassification {
+  Standard
+  Protective
+  MajorMinor
+}
+
+enum ParkingType {
+  Fixed
+  Property
+  Temporary
+}
+
+//车位
+model ParkingSpot {
+  id                   String                 @id @default(cuid())
+  code                 String
+  status               ParkingSpotStatus
+  classification       ParkingClassification
+  type                 ParkingType
+  floor                String
+  area                 Float?
+  number               Int?
+  remark               String?                @db.Text
+  effective            Boolean                @default(true)
+  enableQrcode         Boolean                @default(false)
+  createdAt            DateTime               @default(now())
+  ParkingStatusHistory ParkingStatusHistory[]
+  projectId            String
+  Project              Project                @relation(references: [id], fields: [projectId])
+  ResidentParkingSpots ResidentParkingSpot[]
+  BillingRequests      BillingRequest[]
+  Prepayments          Prepayment[]
+}
+
+model ParkingStatusHistory {
+  id            String            @id @default(cuid())
+  oldStatus     ParkingSpotStatus
+  status        ParkingSpotStatus
+  updatedTime   DateTime
+  createdAt     DateTime          @default(now())
+  createdById   String
+  CreatedBy     Staff             @relation("ParkingStatusHistory", fields: [createdById], references: [id])
+  parkingSpotId String            @unique
+  ParkingSpot   ParkingSpot       @relation(fields: [parkingSpotId], references: [id])
+}
+
+enum ParkingSpotStatus {
+  Occupied
+  Vacant
+  SoldVacant
+  Prohibited
+}
+
+enum BuildingType {
+  Residential
+  Villa
+  Apartment
+  Office
+  Storefront
+  Basement
+  Warehouse
+  StorageRoom
+}
+
+model Unit {
+  id         String   @id @default(cuid())
+  buildingId String
+  Building   Building @relation(fields: [buildingId], references: [id])
+  name       String?
+  number     String   @db.Char(2)
+}
+
+enum HouseholdStatus {
+  PendingMoveIn
+  InUse
+  UnderRenovation
+  VacantAfterRenovation
+  VacantAfterHandover
+  Vacant
+}
+
+//房屋
+model Household {
+  id                     String                   @id @default(cuid())
+  status                 HouseholdStatus          @default(InUse)
+  warrantyStart          DateTime?
+  expiredAt              DateTime?
+  building               String
+  buildingId             String?
+  Building               Building?                @relation(fields: [buildingId], references: [id])
+  type                   BuildingType             @default(Residential)
+  unit                   String?
+  floor                  String?
+  unitId                 String?
+  roomId                 String?                  @unique
+  room                   String
+  name                   String?
+  insideArea             Float?
+  structuralArea         Float?
+  remark                 String?                  @db.Text
+  renovated              Boolean                  @default(false)
+  Project                Project                  @relation(fields: [projectId], references: [id])
+  projectId              String
+  WorkOrders             WorkOrder[]
+  RenovationSteps        RenovationStep[]
+  RenovationViolations   RenovationViolation[]
+  HouseholdStatusHistory HouseholdStatusHistory[]
+  ResidentHouseholds     ResidentHousehold[]
+  BillingRequests        BillingRequest[]
+  Prepayments            Prepayment[]
+}
+
+model HouseholdStatusHistory {
+  id                 String          @id @default(cuid())
+  oldStatus          HouseholdStatus
+  status             HouseholdStatus
+  saleUpdatedAt      DateTime
+  useStatusUpdatedAt DateTime
+  createdAt          DateTime        @default(now())
+  createdById        String
+  CreatedBy          Staff           @relation("HouseholdStatusHistory", fields: [createdById], references: [id])
+  householdId        String
+  Household          Household       @relation(fields: [householdId], references: [id])
+}
+
+model RenovationViolation {
+  id                     String    @id @default(cuid())
+  Household              Household @relation(fields: [householdId], references: [id])
+  householdId            String
+  time                   DateTime
+  description            String    @db.Text
+  picturesUrl            String?   @db.Text
+  abarbeitung            String?
+  abarbeitungPicturesUrl String?   @db.Text
+  CreatedBy              Staff     @relation("RenovationViolations", fields: [createdById], references: [id])
+  createdById            String
+}
+
+model RenovationStep {
+  id          String               @id @default(cuid())
+  stage       Int
+  status      RenovationStepStatus @default(Pending)
+  Household   Household            @relation(fields: [householdId], references: [id])
+  householdId String
+  picturesUrl String?              @db.Text
+
+  @@unique([householdId, stage])
+}
+
+enum RenovationStepStatus {
+  Pending
+  InProgress
+  Completed
+}
+
+enum EntranceGuardScope {
+  Area
+  Unit
+}
+
+model Activity {
+  id               String           @id @default(cuid())
+  name             String
+  description      String           @db.Text
+  place            String
+  meetingPlace     String?
+  peopleLimit      Int?
+  fullPrice        Float
+  discountPrice    Float
+  createdAt        DateTime         @default(now())
+  startDate        DateTime
+  endDate          DateTime
+  ActivityRecords  ActivityRecord[]
+  appToken         String?
+  tableId          String?
+  tableUrl         String?          @db.Text
+  pictureUrl       String           @db.Text
+  createdByStaffId String
+  projectId        String
+  Project          Project          @relation(fields: [projectId], references: [id])
+  CreatedBy        Staff            @relation(fields: [createdByStaffId], references: [id])
+  status           PostStatus       @default(Pending)
+  updatedAt        DateTime         @updatedAt
+}
+
+model ActivityRecord {
+  id               String   @id @default(cuid())
+  applicantId      String
+  activityId       String
+  Activity         Activity @relation(fields: [activityId], references: [id])
+  numberOfPeople   Int
+  room             String
+  recordId         String?
+  Applicant        Resident @relation("AppliedActivities", fields: [applicantId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  contactPhone     String
+  remark           String?
+  volunteerWilling Boolean  @default(false)
+}
+
+model AssociationRecord {
+  id            String      @id @default(cuid())
+  applicantId   String
+  associationId String
+  Association   Association @relation(fields: [associationId], references: [id])
+  room          String?
+  recordId      String?
+  Applicant     Resident    @relation("AppliedAssociationRecords", fields: [applicantId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  contactPhone  String?
+  remark        String?
+}
+
+enum Payer {
+  Resident
+  Property
+  RealEstate
+}
+
+model WorkOrder {
+  id                     String                         @id @default(cuid())
+  isRealEstate           Boolean                        @default(false)
+  status                 WorkOrderStatus                @default(Initial)
+  projectId              String
+  Project                Project                        @relation(fields: [projectId], references: [id])
+  Household              Household?                     @relation(fields: [householdId], references: [id])
+  householdId            String?
+  payer                  Payer                          @default(Resident)
+  Applicant              Resident?                      @relation("Applicant", fields: [applicantPhone], references: [phone])
+  applicantPhone         String?
+  Agent                  Staff?                         @relation("Agent", fields: [agentPhone], references: [phone])
+  agentPhone             String?
+  isCommonArea           Boolean                        @default(false)
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+  isCharged              Boolean?
+  workOrderType          WorkOrderType
+  classification         String
+  description            String                         @db.Text
+  appointmentTime        String
+  Operator               Staff?                         @relation("Operator", fields: [operatorPhone], references: [phone])
+  operatorPhone          String?
+  amount                 Float?
+  FeeOrder               FeeOrder?
+  islocked               Boolean                        @default(false)
+  Comment                Comment?
+  reportPicsUrl          String                         @db.Text
+  WorkOrderStatusHistory WorkOrderStatusChangeHistory[] @relation("WorkOrderStatusHistory")
+  ExpenseDetail          Expense[]                      @relation("ExpenseDetail")
+}
+
+model WorkOrderStatusChangeHistory {
+  id             String          @id @default(cuid())
+  oldStatus      WorkOrderStatus
+  status         WorkOrderStatus
+  updatedType    WorkOrderType?
+  workOrder      WorkOrder       @relation("WorkOrderStatusHistory", fields: [workOrderId], references: [id])
+  workOrderId    String
+  createdAt      DateTime        @default(now())
+  CreatedBy      User?           @relation("CreatedByUser", fields: [createdByPhone], references: [phone])
+  createdByPhone String?
+  createdByName  String?
+  tempValue      String?         @db.Text
+  description    String?         @db.Text
+}
+
+model Comment {
+  id          String     @id @default(cuid())
+  content     String?
+  rating      String
+  attitude    String
+  suggestion  String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  WorkOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
+  workOrderId String?    @unique
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  name        String
+  amount      Float
+  description String?
+  WorkOrder   WorkOrder @relation("ExpenseDetail", fields: [workOrderId], references: [id])
+  workOrderId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  visible     Boolean   @default(true)
+}
+
+//费用类别
+model ExpenseCategory {
+  id           Int               @id @default(autoincrement())
+  name         String
+  parentId     Int?
+  ExpenseItems ExpenseItem[]
+  Parent       ExpenseCategory?  @relation("ExpenseChildren", fields: [parentId], references: [id])
+  Children     ExpenseCategory[] @relation("ExpenseChildren")
+}
+
+//费用项目
+model ExpenseItem {
+  id                String            @id @default(cuid())
+  name              String
+  feeType           FeeType
+  precisiion        CNYPrecision
+  roundType         RoundType
+  enabled           Boolean           @default(true)
+  remark            String?
+  ExpenseCategory   ExpenseCategory?  @relation(fields: [expenseCategoryId], references: [id])
+  expenseCategoryId Int?
+  Prepayments       Prepayment[]
+  projectId         String
+  Project           Project           @relation(fields: [projectId], references: [id])
+  ExpenseStandards  ExpenseStandard[]
+}
+
+//费用标准
+model ExpenseStandard {
+  id                     String                 @id @default(cuid())
+  name                   String
+  cycleMonths            Int
+  dataSource             ExpenseDataSource
+  precisiion             CNYPrecision
+  roundType              RoundType
+  allowInput             Boolean
+  houseOrParkingRequired Boolean
+  baseValue              Float                  @default(0)
+  calculateLiquidated    Boolean
+  remark                 String?                @db.Text
+  ExpenseItem            ExpenseItem            @relation(fields: [expenseItemId], references: [id])
+  expenseItemId          String
+  ConditionCalculations  ConditionCalculation[]
+}
+
+//条件计算
+model ConditionCalculation {
+  id                String           @id @default(cuid())
+  type              String           @default("none")
+  ExpenseStandard   ExpenseStandard  @relation(fields: [expenseStandardId], references: [id])
+  expenseStandardId String
+  FeeCalculations   FeeCalculation[]
+}
+
+//计算方式表
+model FeeCalculation {
+  id                     String               @id @default(cuid())
+  type                   CalculationType
+  value                  Float
+  ConditionCalculation   ConditionCalculation @relation(fields: [conditionCalculationId], references: [id])
+  conditionCalculationId String
+  BillingRequests        BillingRequest[]
+}
+
+enum CalculationType {
+  UnitPrice
+  FixedValue
+}
+
+enum ExpenseDataSource {
+  StructuralArea
+  ParkingSpotArea
+  FixedValue
+}
+
+enum RoundType {
+  Ceiling
+  Floor
+  Nearest
+}
+
+enum RoundingMethod {
+  NoRounding
+  RoundUpToYuan
+  RoundUpToJiao
+  RoundDownToYuan
+  RoundDownToJiao
+}
+
+enum CNYPrecision {
+  Yuan
+  Jiao
+  Fen
+}
+
+enum FeeType {
+  Income
+  Collection
+  Temporary
+}
+
+model FeeOrder {
+  id           String         @id @default(cuid())
+  code         String         @unique
+  title        String
+  trasactionId String?        @unique
+  status       FeeOrderStatus @default(Unpaid)
+  WorkOrder    WorkOrder      @relation(fields: [workOrderId], references: [id])
+  workOrderId  String         @unique
+  amount       Float
+  visible      Boolean        @default(true)
+  paidAmount   String?
+  paidAt       DateTime?
+  paidMethod   String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  remark       String?
+  CreatedBy    Resident       @relation("FeeOrders", fields: [userPhone], references: [phone])
+  userPhone    String
+}
+
+model Perspective {
+  id             String          @id @default(cuid())
+  type           PerspectiveType
+  content        String          @db.Text
+  pictureUrl     String          @db.Text
+  createdAt      DateTime        @default(now())
+  createdById    String
+  CreatedBy      Resident        @relation("Perspectives", fields: [createdById], references: [id])
+  Project        Project         @relation("ProjectPerspectives", fields: [projectId], references: [id])
+  projectId      String
+  contactPhone   String?
+  contactAddress String?
+}
+
+model Announcement {
+  id          String     @id @default(cuid())
+  status      PostStatus @default(Pending)
+  top         Boolean    @default(false)
+  title       String
+  expiredAt   DateTime?
+  content     String     @db.Text
+  pictureUrl  String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdById String
+  CreatedBy   Staff      @relation("Announcements", fields: [createdById], references: [id])
+  Project     Project    @relation("ProjectAnnouncements", fields: [projectId], references: [id])
+  projectId   String
+}
+
+model Association {
+  id                String              @id @default(cuid())
+  name              String
+  kol               String?
+  intro             String?             @db.Text
+  projectId         String
+  initiatorId       String?
+  Initiator         Resident?           @relation(fields: [initiatorId], references: [id])
+  pictureUrls       String?
+  Project           Project             @relation("Associations", fields: [projectId], references: [id])
+  Members           Resident[]          @relation("JoinedAssociations")
+  AssociationRecord AssociationRecord[]
+}
+
+enum PostStatus {
+  Pending
+  Active
+  Canceled
+  Done
+}
+
+enum PerspectiveType {
+  Praise
+  Suggestions
+  Complaints
+}
+
+enum FeeOrderStatus {
+  Unpaid
+  Paid
+}
+
+enum WorkOrderStatus {
+  Initial
+  Unassigned
+  AssignedAndWaitingWorkerTaking
+  WorkerAcceptedAndWaitingOperating
+  WorkerRefusedAndWaitingReassign
+  Operating
+  WaitingApplicantConfirmingAmount
+  SuspendedAndWaitingApplicantConfirming
+  Canceled
+  AmountConfirmedByApplicant
+  Unchecked
+  CheckedAndWaitingAddingComment
+  Completed
+}
+
+enum WorkOrderType {
+  Customer
+  Environment
+  Engineering
+  Order
+  RealEstate
+}
+
+//权限
+model Permission {
+  id     String @id @default(cuid())
+  menuId Int
+  Menu   Menu   @relation("MenuPermissions", fields: [menuId], references: [id])
+  action String
+  Roles  Role[]
+}
+
+//菜单
+model Menu {
+  id          Int          @id @default(autoincrement())
+  name        String
+  parentId    Int?
+  Permissions Permission[] @relation("MenuPermissions")
+  Parent      Menu?        @relation("MenuChildren", fields: [parentId], references: [id])
+  Children    Menu[]       @relation("MenuChildren")
+}
+
+//角色
+model Role {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime     @default(now())
+  CreatedBy   Staff        @relation(fields: [createdById], references: [id])
+  createdById String
+  deletable   Boolean      @default(true)
+  Permissions Permission[]
+  Staffs      Staff[]      @relation("StaffRoles")
+}
+
+model ScreenData {
+  id                               Int    @id @default(autoincrement())
+  project                          String
+  prospectiveOwners                Int
+  satisfactionSurveyCompletionRate Float
+  ownerActivitySatisfaction        Float
+  numberOfCommunities              Int
+  communityEventCount              Int
+  communityParticipants            Int
+  totalCommunityEventCost          Int
+  communityKolCount                Int
+  kolActivityEngagement            Float
+  preVideos                        Int
+  preImages                        Int
+  preTexts                         Int
+  postVideos                       Int
+  postImages                       Int
+  postTexts                        Int
+  holiday                          Int
+  weather                          Int
+  birthday                         Int
+  memorable                        Int
+  consultationFeedbackCount        Int
+}
+
+model Prepayment {
+  id                String             @id @default(cuid())
+  remark            String?
+  householdId       String?
+  remaining         Float              @default(0)
+  updatedAt         DateTime           @updatedAt
+  Household         Household?         @relation(fields: [householdId], references: [id])
+  parkingSpotId     String?
+  ParkingSpot       ParkingSpot?       @relation(fields: [parkingSpotId], references: [id])
+  resourceId        String
+  autoOffset        Boolean            @default(false)
+  expenseItemId     String
+  ExpenseItem       ExpenseItem        @relation(fields: [expenseItemId], references: [id])
+  createdAt         DateTime           @default(now())
+  Transfers         Transfer[]
+  Offsets           Offset[]
+  PrepaymentDetails PrepaymentDetail[]
+
+  @@unique([resourceId, expenseItemId])
+}
+
+//预存金额明细表
+model PrepaymentDetail {
+  id              String         @id @default(cuid())
+  amount          Float
+  totalRemaining  Float
+  createdAt       DateTime       @default(now())
+  operatorId      String
+  Operator        Staff          @relation("PrepaymentDetailOperator", fields: [operatorId], references: [id])
+  remark          String?
+  prepaymentId    String
+  Prepayment      Prepayment     @relation(fields: [prepaymentId], references: [id])
+  BillingRecord   BillingRecord? @relation(fields: [billingRecordId], references: [id])
+  billingRecordId String?
+}
+
+enum BillingRequestStatus {
+  Approved
+  Rejected
+  Pending
+}
+
+enum FrozenStatus {
+  None
+  Manual
+  System
+}
+
+model BillingRequest {
+  id               String               @id @default(cuid())
+  amount           Float
+  expenseItemName  String
+  code             String               @unique
+  status           BillingRequestStatus
+  frozen           FrozenStatus         @default(None)
+  frozenReason     String?
+  createdAt        DateTime             @default(now())
+  FeeCalculation   FeeCalculation?      @relation(fields: [feeCalculationId], references: [id])
+  feeCalculationId String?
+  createdById      String
+  CreatedBy        Staff                @relation("BillingRequestCreator", fields: [createdById], references: [id])
+  updatedAt        DateTime             @updatedAt
+  approverId       String?
+  Approver         Staff?               @relation("BillingRequestApprover", fields: [approverId], references: [id])
+  approvedAt       DateTime?
+  expenseStartAt   Int
+  expenseEndAt     Int
+  belongToMonth    Int
+  Discounts        Discount[]
+  Adjustments      Adjustment[]
+  Transfers        Transfer[]
+  Offsets          Offset[]
+  remark           String?
+  dueDate          DateTime
+  attachmentUrl    String?              @db.Text
+  BillingRecords   BillingRecord[]
+  ParkingSpot      ParkingSpot?         @relation(fields: [parkingSpotId], references: [id])
+  parkingSpotId    String?
+  Household        Household?           @relation(fields: [householdId], references: [id])
+  householdId      String?
+  Resident         Resident             @relation(fields: [residentId], references: [id])
+  residentId       String
+  role             ResidentRole         @default(Owner)
+  feeType          FeeType              @default(Collection)
+  area             Float                @default(130)
+  calculationType  CalculationType      @default(UnitPrice)
+  calculationValue Float                @default(15)
+  expenseStandard  String               @default("test1")
+  dataSource       ExpenseDataSource    @default(StructuralArea)
+  cycleMonths      Int                  @default(0)
+  Voiding          Voiding?
+}
+
+//收款信息表
+model BillingRecord {
+  id                String              @id @default(cuid())
+  approvalBookId    String
+  ApprovalBook      ApprovalBook        @relation(fields: [approvalBookId], references: [id])
+  approvalCode      String              @unique
+  code              String              @unique
+  createdAt         DateTime            @default(now())
+  paidAt            DateTime
+  updatedAt         DateTime            @updatedAt
+  payer             String
+  roundMethod       RoundingMethod      @default(NoRounding)
+  remark            String?
+  operatorId        String
+  Operator          Staff               @relation("BillingRecordOperator", fields: [operatorId], references: [id])
+  status            BillingRecordStatus @default(Normal)
+  handover          Boolean             @default(false)
+  Voiding           Voiding?
+  Receipts          Receipt[]
+  BillingRequests   BillingRequest[]
+  PrepaymentDetails PrepaymentDetail[]
+  PrintRecords      PrintRecord[]
+}
+
+model PrintRecord {
+  id              String        @id @default(cuid())
+  createdAt       DateTime      @default(now())
+  Operator        Staff         @relation(fields: [operatorId], references: [id])
+  operatorId      String
+  BilligingRecord BillingRecord @relation(fields: [billingRecordId], references: [id])
+  billingRecordId String
+}
+
+enum BillingRecordStatus {
+  Normal
+  Invalid
+}
+
+model Receipt {
+  id              String        @id @default(cuid())
+  amount          Float
+  paymethod       PaymentMethod
+  billingRecordId String
+  BillingRecord   BillingRecord @relation(fields: [billingRecordId], references: [id])
+}
+
+// 定义枚举类型
+enum PaymentMethod {
+  Cash
+  POS
+  CreditCard
+  DebitCard
+  QrCode
+  Scan
+  OnlineBanking
+}
+
+//减免明细
+model Discount {
+  id               String          @id @default(cuid())
+  type             DiscountType
+  amount           Float
+  code             String          @unique
+  reason           String?
+  applicantId      String
+  Applicant        Staff           @relation("DiscountApplicant", fields: [applicantId], references: [id])
+  approverId       String
+  Approver         Staff           @relation("DiscountApprover", fields: [approverId], references: [id])
+  approvedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  BillingRequest   BillingRequest? @relation(fields: [billingRequestId], references: [id])
+  billingRequestId String?
+}
+
+enum DiscountType {
+  BreachPenaltyWaiver
+  EmployeeDiscount
+  VacantRoomDiscount
+  DepositDiscount
+  OtherDiscount
+}
+
+//调整明细
+model Adjustment {
+  id               String          @id @default(cuid())
+  amount           Float
+  code             String          @unique
+  reason           String?
+  type             AdjustmentType
+  applicantId      String
+  Applicant        Staff           @relation("AdjustmentApplicant", fields: [applicantId], references: [id])
+  approverId       String
+  Approver         Staff           @relation("AdjustmentApprover", fields: [approverId], references: [id])
+  approvedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  BillingRequest   BillingRequest? @relation(fields: [billingRequestId], references: [id])
+  billingRequestId String?
+}
+
+enum AdjustmentType {
+  VoidedBill
+  RoundUp
+  RoundDown
+  TailDifference
+  PriceDifference
+  Other
+}
+
+//转移明细
+model Transfer {
+  id               String          @id @default(cuid())
+  amount           Float
+  code             String
+  reason           String?
+  applicantId      String
+  Applicant        Staff           @relation("TransferApplicant", fields: [applicantId], references: [id])
+  approverId       String
+  Approver         Staff           @relation("TransferApprover", fields: [approverId], references: [id])
+  approvedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  BillingRequest   BillingRequest? @relation(fields: [billingRequestId], references: [id])
+  billingRequestId String?
+  Prepayment       Prepayment?     @relation(fields: [prepaymentId], references: [id])
+  prepaymentId     String?
+}
+
+//
+model Offset {
+  id               String          @id @default(cuid())
+  type             OffsetType
+  amount           Float
+  operatorId       String
+  Operator         Staff           @relation("OffsetOperator", fields: [operatorId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  BillingRequest   BillingRequest? @relation(fields: [billingRequestId], references: [id])
+  billingRequestId String?
+  Prepayment       Prepayment?     @relation(fields: [prepaymentId], references: [id])
+  prepaymentId     String?
+}
+
+enum OffsetType {
+  Auto
+  Manual
+}
+
+//核销明细
+model Voiding {
+  id               String          @id @default(cuid())
+  status           VoidingStatus   @default(Pending)
+  applicantId      String
+  reason           String?
+  Applicant        Staff           @relation("VodingApplicant", fields: [applicantId], references: [id])
+  approverId       String?
+  BillingRequest   BillingRequest? @relation(fields: [billingRequestId], references: [id])
+  billingRequestId String?         @unique
+  Approver         Staff?          @relation("VoidingApprover", fields: [approverId], references: [id])
+  BillingRecord    BillingRecord?  @relation(fields: [billingRecordId], references: [id])
+  billingRecordId  String?         @unique
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  approvedAt       DateTime?
+}
+
+enum VoidingStatus {
+  Pending
+  Approved
+  Rejected
+  Canceled
+}
+
+model ApprovalBook {
+  id             String          @id @default(cuid())
+  name           String
+  acronym        String
+  projectId      String          @unique
+  Project        Project         @relation(fields: [projectId], references: [id])
+  BillingRecords BillingRecord[]
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  createdAt DateTime @default(now())
+}
+
+model CasbinRule {
+  id    Int     @id @default(autoincrement())
+  ptype String
+  v0    String?
+  v1    String?
+  v2    String?
+  v3    String?
+  v4    String?
+  v5    String?
+
+  @@map("casbin_rule")
+}
